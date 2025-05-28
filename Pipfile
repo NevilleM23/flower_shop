@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 faker = "*"
+tabulate = "*"
+inquirer = "*"
 
 [dev-packages]
 

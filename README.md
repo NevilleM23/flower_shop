@@ -18,7 +18,6 @@ A Python-based CLI system for comprehensive shop management.
 ### Customer Management
 - Add/edit customer profiles (name, contact, preferences)
 - View customer purchase history
-- Track customer loyalty points
 - Search customers by name/phone
 
 ### Order Management
