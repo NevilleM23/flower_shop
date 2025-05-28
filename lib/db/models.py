@@ -14,6 +14,9 @@ class Flower(Base):
     
     order_items = relationship("OrderItem", back_populates="flower")
 
+    def is_low_stock(self):
+        return self.quantity < self.low_stock_threshold
+
 class Customer(Base):
     __tablename__ = 'customers'
     id = Column(Integer, primary_key=True)
