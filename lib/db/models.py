@@ -11,6 +11,7 @@ class Flower(Base):
     price = Column(Float, nullable=False)
     quantity = Column(Integer, nullable=False)
     category = Column(String(50))
+    low_stock_threshold = Column(Integer, default=10)
     
     order_items = relationship("OrderItem", back_populates="flower")
 
@@ -43,7 +44,7 @@ class Order(Base):
     customer_id = Column(Integer, ForeignKey('customers.id'))
     status = Column(String(20), default='pending')
     total = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime)
     
     customer = relationship("Customer", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
