@@ -454,3 +454,288 @@ def view_customer_history(db):
             print(f"   - {item.flower.name}: {item.quantity} x {format_currency(item.flower.price)}")
     
     press_enter()
+
+
+#  Order Management
+
+def order_menu(db):
+    """Order management menu"""
+    while True:
+        display_header("Order Management")
+        choice = inquirer.prompt([
+            inquirer.List('action',
+                message="What would you like to do?",
+                choices=[
+                    ('View All Orders', 'view'),
+                    ('Create New Order', 'create'),
+                    ('Update Order Status', 'update'),
+                    ('View Order Details', 'details'),
+                    ('Search Orders', 'search'),
+                    ('Back to Main Menu', 'back')
+                ],
+            )
+        ])['action']
+        
+        if choice == 'view': view_orders(db)
+        elif choice == 'create': create_order(db)
+        elif choice == 'update': update_order_status(db)
+        elif choice == 'details': view_order_details(db)
+        elif choice == 'search': search_orders(db)
+        elif choice == 'back': return
+
+def view_orders(db):
+    """View all orders"""
+    display_header("All Orders")
+    orders = db.query(Order).order_by(Order.created_at.desc()).all()
+    
+    if not orders:
+        print("No orders found")
+        press_enter()
+        return
+    
+    data = []
+    for order in orders:
+        status = ""
+        if order.status == 'completed':
+            status = "COMPLETED"
+        elif order.status == 'cancelled':
+            status = "CANCELLED"
+        else:
+            status = "PENDING"
+        
+        data.append([
+            order.id, order.customer.name, 
+            order.created_at.strftime('%Y-%m-%d'),
+            format_currency(order.total), status
+        ])
+    
+    print_table(["ID", "Customer", "Date", "Total", "Status"], data)
+    press_enter()
+
+def create_order(db):
+    """Create a new order"""
+    display_header("Create New Order")
+    customers = db.query(Customer).all()
+    
+    if not customers:
+        print("No customers available")
+        press_enter()
+        return
+    
+    # Select customer
+    choices = [(f"{c.name} ({c.email})", c.id) for c in customers]
+    customer_id = inquirer.prompt([
+        inquirer.List('id', "Select customer", choices=choices)
+    ])['id']
+    
+    # Create order
+    order = Order(customer_id=customer_id)
+    db.add(order)
+    db.flush()  # Get ID without committing
+    
+    
+    while True:
+        flowers = db.query(Flower).filter(Flower.quantity > 0).all()
+        if not flowers:
+            print("No flowers available")
+            break
+        
+        choices = [
+            ('Add another item', 'add'),
+            ('Finish order', 'finish'),
+            ('Cancel order', 'cancel')
+        ]
+        action = inquirer.prompt([
+            inquirer.List('action', "Add items to order?", choices=choices)
+        ])['action']
+        
+        if action == 'finish':
+            break
+        elif action == 'cancel':
+            db.rollback()
+            print("\n Order canceled")
+            press_enter()
+            return
+        
+        # Select flower
+        choices = [(f"{f.name} - {format_currency(f.price)} (Stock: {f.quantity})", f.id) for f in flowers]
+        flower_id = inquirer.prompt([
+            inquirer.List('id', "Select flower", choices=choices)
+        ])['id']
+        
+        flower = db.query(Flower).get(flower_id)
+        
+        # Select quantity
+        quantity = inquirer.prompt([
+            inquirer.Text('qty', 
+                f"How many? (1-{flower.quantity})", 
+                validate=lambda _, x: x.isdigit() and 1 <= int(x) <= flower.quantity)
+        ])['qty']
+        quantity = int(quantity)
+        
+        # Add item
+        order_item = OrderItem(
+            order_id=order.id,
+            flower_id=flower.id,
+            quantity=quantity
+        )
+        db.add(order_item)
+        
+        # Update order total
+        order.total = (order.total or 0) + (flower.price * quantity)
+        print(f"Added {quantity} {flower.name} to order")
+    
+    # Finalize order
+    if not order.items:
+        db.rollback()
+        print("\n Order canceled - no items added")
+        press_enter()
+        return
+    
+    # Set status
+    status = inquirer.prompt([
+        inquirer.List('status', "Order status", 
+            choices=[('Completed', 'completed'), ('Pending', 'pending')],
+            default='completed')
+    ])['status']
+    
+    order.status = status
+    
+    # Update stock if completed
+    if status == 'completed':
+        for item in order.items:
+            flower = db.query(Flower).get(item.flower_id)
+            flower.quantity -= item.quantity
+    
+    try:
+        db.commit()
+        print(f"\n Order #{order.id} created successfully!")
+        print(f"Total: {format_currency(order.total)}")
+    except Exception as e:
+        db.rollback()
+        print(f"\n Error creating order: {str(e)}")
+    
+    press_enter()
+
+def update_order_status(db):
+    """Update order status"""
+    display_header("Update Order Status")
+    orders = db.query(Order).all()
+    
+    if not orders:
+        print("No orders available")
+        press_enter()
+        return
+    
+    choices = [(f"Order #{o.id} - {o.customer.name} - {o.status}", o.id) for o in orders]
+    answers = inquirer.prompt([
+        inquirer.List('id', "Select order", choices=choices),
+        inquirer.List('status', "New status", 
+            choices=[('Completed', 'completed'), ('Pending', 'pending'), ('Cancelled', 'cancelled')])
+    ])
+    
+    order = db.query(Order).get(answers['id'])
+    if not order:
+        print("Order not found")
+        press_enter()
+        return
+    
+    new_status = answers['status']
+    
+    try:
+        # Handle status changes
+        if new_status == 'completed' and order.status != 'completed':
+            for item in order.items:
+                flower = item.flower
+                flower.quantity -= item.quantity
+        
+        elif new_status == 'cancelled' and order.status == 'completed':
+            # Restore stock
+            for item in order.items:
+                flower = item.flower
+                flower.quantity += item.quantity
+        
+        order.status = new_status
+        db.commit()
+        print(f"\n Order #{order.id} updated to {new_status} successfully!")
+    except Exception as e:
+        db.rollback()
+        print(f"\n Error: {str(e)}")
+    
+    press_enter()
+
+def view_order_details(db):
+    """View order details"""
+    display_header("Order Details")
+    orders = db.query(Order).order_by(Order.created_at.desc()).limit(10).all()
+    
+    if not orders:
+        print("No orders available")
+        press_enter()
+        return
+    
+    choices = [(f"Order #{o.id} - {o.customer.name} - {format_currency(o.total)}", o.id) for o in orders]
+    order_id = inquirer.prompt([
+        inquirer.List('id', "Select order", choices=choices)
+    ])['id']
+    
+    order = db.query(Order).get(order_id)
+    if not order:
+        print("Order not found")
+        press_enter()
+        return
+    
+    display_header(f"Order #{order.id} Details")
+    print(f"Customer: {order.customer.name}")
+    print(f"Date: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
+    print(f"Status: {order.status.capitalize()}")
+    print(f"Total: {format_currency(order.total)}\n")
+    
+    print("Items:")
+    data = [[
+        item.flower.name, item.quantity, 
+        format_currency(item.flower.price), 
+        format_currency(item.quantity * item.flower.price)
+    ] for item in order.items]
+    
+    print_table(["Flower", "Qty", "Price", "Total"], data)
+    press_enter()
+
+def search_orders(db):
+    """Search orders by ID or customer name"""
+    display_header("Search Orders")
+    query = inquirer.prompt([
+        inquirer.Text('query', "Search by order ID or customer name")
+    ])['query']
+    
+    if not query:
+        return
+    
+    try:
+        # Search by ID if query is numeric
+        order_id = int(query)
+        orders = db.query(Order).filter(Order.id == order_id).all()
+    except ValueError:
+        # Search by customer name
+        orders = db.query(Order).join(Customer).filter(
+            Customer.name.ilike(f"%{query}%")
+        ).all()
+    
+    if not orders:
+        print("No matching orders found")
+        press_enter()
+        return
+    
+    data = []
+    for order in orders:
+        status = " COMPLETED" if order.status == 'completed' else (
+            " CANCELLED" if order.status == 'cancelled' else "🔄 PENDING"
+        )
+        data.append([
+            order.id, order.customer.name, 
+            order.created_at.strftime('%Y-%m-%d'),
+            format_currency(order.total), status
+        ])
+    
+    print_table(["ID", "Customer", "Date", "Total", "Status"], data)
+    press_enter()
