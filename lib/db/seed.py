@@ -49,7 +49,6 @@ def seed_database():
                 price=round(random.uniform(5.99, 29.99), 2),
                 quantity=random.randint(5, 100),
                 category=category,
-                low_stock_threshold=random.randint(5, 15)
             ))
         db.add_all(flowers)
         db.commit()
@@ -63,7 +62,6 @@ def seed_database():
                 name=fake.name(),
                 phone=fake.phone_number(),
                 email=fake.email(),
-                loyalty_points=random.randint(0, 500)
             ))
         db.add_all(customers)
         db.commit()
@@ -119,11 +117,6 @@ def seed_database():
             # Set order total and add loyalty points
             order.total = round(order_total, 2)
             
-            if order.status == 'completed':
-                # Add loyalty points (1 point per $10 spent)
-                points_earned = int(order_total // 10)
-                customer.loyalty_points += points_earned
-        
         db.commit()
         print(f"Seeded {len(orders)} orders with {len(order_items)} items")
         

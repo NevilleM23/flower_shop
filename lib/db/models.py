@@ -24,7 +24,6 @@ class Customer(Base):
     name = Column(String(100), nullable=False)
     phone = Column(String(20), unique=True)
     email = Column(String(100))
-    loyalty_points = Column(Integer, default=0)
     
     orders = relationship("Order", back_populates="customer")
 
