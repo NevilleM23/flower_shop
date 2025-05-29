@@ -54,7 +54,7 @@ def main_menu():
             choices=[
                 ('Stock Management', 'stock'),
                 ('Customer Management', 'customer'),
-                (' Order Management', 'order'),
+                ('Order Management', 'order'),
                 ('Reports', 'reports'),
                 (' Exit', 'exit')
             ],
@@ -136,7 +136,7 @@ def add_flower(db):
         print(f"\n Added {flower.name} successfully!")
     except Exception as e:
         db.rollback()
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\n Error: {str(e)}")
     
     press_enter()
 
@@ -273,3 +273,184 @@ def check_low_stock(db):
     print_table(["ID", "Name", "Current", "Threshold", "Category"], data)
     press_enter()
 
+
+# Customer Management 
+
+def customer_menu(db):
+    """Customer management menu"""
+    while True:
+        display_header("Customer Management")
+        choice = inquirer.prompt([
+            inquirer.List('action',
+                message="What would you like to do?",
+                choices=[
+                    ('View All Customers', 'view'),
+                    ('Add New Customer', 'add'),
+                    ('Update Customer', 'update'),
+                    ('Search Customers', 'search'),
+                    ('View Purchase History', 'history'),
+                    ('Back to Main Menu', 'back')
+                ],
+            )
+        ])['action']
+        
+        if choice == 'view': view_customers(db)
+        elif choice == 'add': add_customer(db)
+        elif choice == 'update': update_customer(db)
+        elif choice == 'search': search_customers(db)
+        elif choice == 'history': view_customer_history(db)
+        elif choice == 'back': return
+
+def view_customers(db):
+    """View all customers"""
+    display_header("All Customers")
+    customers = db.query(Customer).order_by(Customer.name).all()
+    
+    if not customers:
+        print("No customers found")
+        press_enter()
+        return
+    
+    data = [[
+        c.id, c.name, c.phone, 
+        c.email, len(c.orders)
+    ] for c in customers]
+    
+    print_table(["ID", "Name", "Phone", "Email", "Orders"], data)
+    press_enter()
+
+def add_customer(db):
+    """Add a new customer"""
+    display_header("Add New Customer")
+    answers = inquirer.prompt([
+        inquirer.Text('name', "Full name"),
+        inquirer.Text('phone', "Phone number"),
+        inquirer.Text('email', "Email address"),
+    ])
+    
+    try:
+        customer = Customer(
+            name=answers['name'],
+            phone=answers['phone'],
+            email=answers['email']
+        )
+        db.add(customer)
+        db.commit()
+        print(f"\n Added customer {customer.name} successfully!")
+    except Exception as e:
+        db.rollback()
+        print(f"\n Error: {str(e)}")
+    
+    press_enter()
+
+def update_customer(db):
+    """Update customer details"""
+    display_header("Update Customer")
+    customers = db.query(Customer).all()
+    
+    if not customers:
+        print("No customers available")
+        press_enter()
+        return
+    
+    choices = [(f"{c.name} (ID: {c.id})", c.id) for c in customers]
+    customer_id = inquirer.prompt([
+        inquirer.List('id', "Select customer to update", choices=choices)
+    ])['id']
+    
+    customer = db.query(Customer).get(customer_id)
+    if not customer:
+        print("Customer not found")
+        press_enter()
+        return
+    
+    answers = inquirer.prompt([
+        inquirer.Text('name', "Name", default=customer.name),
+        inquirer.Text('phone', "Phone", default=customer.phone),
+        inquirer.Text('email', "Email", default=customer.email),
+    ])
+    
+    try:
+        customer.name = answers['name']
+        customer.phone = answers['phone']
+        customer.email = answers['email']
+        db.commit()
+        print(f"\n Updated {customer.name} successfully!")
+    except Exception as e:
+        db.rollback()
+        print(f"\n Error: {str(e)}")
+    
+    press_enter()
+
+def search_customers(db):
+    """Search customers by name, phone, or email"""
+    display_header("Search Customers")
+    query = inquirer.prompt([
+        inquirer.Text('query', "Search by name, phone, or email")
+    ])['query']
+    
+    if not query:
+        return
+    
+    customers = db.query(Customer).filter(
+        or_(
+            Customer.name.ilike(f"%{query}%"),
+            Customer.phone.ilike(f"%{query}%"),
+            Customer.email.ilike(f"%{query}%")
+        )
+    ).all()
+    
+    if not customers:
+        print("No matching customers found")
+        press_enter()
+        return
+    
+    data = [[
+        c.id, c.name, c.phone, 
+        c.email
+    ] for c in customers]
+    
+    print_table(["ID", "Name", "Phone", "Email"], data)
+    press_enter()
+
+def view_customer_history(db):
+    """View customer purchase history"""
+    display_header("Customer History")
+    customers = db.query(Customer).all()
+    
+    if not customers:
+        print("No customers available")
+        press_enter()
+        return
+    
+    choices = [(f"{c.name} (ID: {c.id})", c.id) for c in customers]
+    customer_id = inquirer.prompt([
+        inquirer.List('id', "Select customer", choices=choices)
+    ])['id']
+    
+    customer = db.query(Customer).get(customer_id)
+    if not customer:
+        print("Customer not found")
+        press_enter()
+        return
+    
+    display_header(f"Purchase History: {customer.name}")
+    print(f" Phone: {customer.phone}")
+    print(f" Email: {customer.email}")
+    print("\nOrders:")
+    
+    orders = customer.orders
+    if not orders:
+        print("No orders found")
+        press_enter()
+        return
+    
+    for order in orders:
+        print(f"\n Order #{order.id} - {order.created_at.strftime('%Y-%m-%d')}")
+        print(f"   Status: {order.status.capitalize()}")
+        print(f"   Total: {format_currency(order.total)}")
+        
+        for item in order.items:
+            print(f"   - {item.flower.name}: {item.quantity} x {format_currency(item.flower.price)}")
+    
+    press_enter()
