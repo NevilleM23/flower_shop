@@ -738,4 +738,108 @@ def search_orders(db):
         ])
     
     print_table(["ID", "Customer", "Date", "Total", "Status"], data)
+    press_enter() 
+
+    # General Expense Reports 
+
+def reports_menu(db):
+        """Reports menu"""
+        while True:
+            display_header("Reports")
+            choice = inquirer.prompt([
+                inquirer.List('action',
+                    message="Select report",
+                    choices=[
+                        ('Sales Summary', 'sales'),
+                        ('Top Selling Flowers', 'flowers'),
+                        ('Top Customers', 'customers'),
+                        ('Back to Main Menu', 'back')
+                    ],
+                )
+            ])['action']
+            
+            if choice == 'sales': sales_summary(db)
+            elif choice == 'flowers': top_flowers(db)
+            elif choice == 'customers': top_customers(db)
+            elif choice == 'back': return
+
+def sales_summary(db):
+    """Sales summary report"""
+    display_header("Sales Summary")
+    
+    # Total sales
+    total_sales = db.query(func.sum(Order.total)).filter(
+        Order.status == 'completed'
+    ).scalar() or 0
+    
+    # Recent sales (last 7 days)
+    recent_sales = db.query(func.sum(Order.total)).filter(
+        Order.status == 'completed',
+        Order.created_at >= datetime.now() - timedelta(days=7)
+    ).scalar() or 0
+    
+    # Order count
+    order_count = db.query(Order).filter(
+        Order.status == 'completed'
+    ).count()
+    
+    print(f"Total Sales: {format_currency(total_sales)}")
+    print(f"Recent Sales (7 days): {format_currency(recent_sales)}")
+    print(f"Total Orders: {order_count}")
+    press_enter()
+
+def top_flowers(db):
+    """Top selling flowers report"""
+    display_header("Top Selling Flowers")
+    
+    results = db.query(
+        Flower.name,
+        func.sum(OrderItem.quantity).label('total_sold'),
+        func.sum(OrderItem.quantity * Flower.price).label('total_revenue')
+    ).join(OrderItem).join(Order).filter(
+        Order.status == 'completed'
+    ).group_by(Flower.name).order_by(
+        func.sum(OrderItem.quantity).desc()
+    ).limit(10).all()
+    
+    if not results:
+        print("No sales data available")
+        press_enter()
+        return
+    
+    data = []
+    for i, row in enumerate(results, 1):
+        data.append([
+            i, row.name, row.total_sold, format_currency(row.total_revenue)
+        ])
+    
+    print_table(["Rank", "Flower", "Units Sold", "Revenue"], data)
+    press_enter()
+
+def top_customers(db):
+    """Top customers report"""
+    display_header("Top Customers")
+    
+    results = db.query(
+        Customer.name,
+        func.count(Order.id).label('order_count'),
+        func.sum(Order.total).label('total_spent')
+    ).join(Order).filter(
+        Order.status == 'completed'
+    ).group_by(Customer.name).order_by(
+        func.sum(Order.total).desc()
+    ).limit(10).all()
+    
+    if not results:
+        print("No customer data available")
+        press_enter()
+        return
+    
+    data = []
+    for i, row in enumerate(results, 1):
+        data.append([
+            i, row.name, row.order_count, format_currency(row.total_spent)
+        ])
+    
+    print_table(["Rank", "Customer", "Orders", "Total Spent"], data)
     press_enter()
