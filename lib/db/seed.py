@@ -1,5 +1,5 @@
-from session import SessionLocal
-from models import Flower, Customer, Order, OrderItem
+from .session import SessionLocal
+from .models import Flower, Customer, Order, OrderItem
 from datetime import datetime, timedelta
 from faker import Faker
 import random
