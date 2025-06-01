@@ -21,8 +21,36 @@ A Python-based CLI system for comprehensive shop management.
 - Search customers by name/phone
 
 ### Order Management
-- Create new orders with customer-flower mapping
 - Calculate order totals
 - Update order status (pending/fulfilled/cancelled)
 - View order history with filters
-- Generate invoices/receipts
+- 
+ ## Installation  
+Clone repository with submodules
+
+git clone https://github.com/NevilleM23/flower_shop
+cd flower_shop
+
+### Create virtual environment
+pipenv --python 3.10
+
+### Install dependencies
+pipenv install
+
+### Initialize database
+pipenv run python lib/cli.py --init
+
+### Start application
+pipenv run python lib/cli.py
+ 
+## Usage 
+### Start the application
+pipenv run python lib/cli.py
+
+### Main Menu Navigation:
+Scroll up and down using the arrow keys and press ENTER when hovered over one of the menu items 
+### Stock Management
+### Customer Management
+### Order Management
+### Reports
+### Exit
