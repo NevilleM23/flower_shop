@@ -1,6 +1,7 @@
 import sys
 import os
-from db.session import SessionLocal
+from db.session import SessionLocal, engine
+from db.models import Base, Flower
 from helpers import (
     main_menu, stock_menu, customer_menu, 
     order_menu, reports_menu, init_database
@@ -28,6 +29,20 @@ class MyShopCLI:
                 self.db.close()
                 sys.exit(0)
 
+def initialize_database():
+    """Initialize database tables and seed data if needed"""
+    Base.metadata.create_all(bind=engine)
+    
+
+    db = SessionLocal()
+    try:
+        if db.query(Flower).count() == 0:
+            print("Seeding database for the first time...")
+            from db.seed import seed_database
+            seed_database()
+    finally:
+        db.close()
+
 if __name__ == '__main__':
-    init_database()
+    initialize_database()
     MyShopCLI()
