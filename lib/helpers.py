@@ -14,7 +14,7 @@ def clear_screen():
 def display_header(title):
     """Display a header with title"""
     clear_screen()
-    print(f"=== MyShop Flower Shop ===")
+    print(f"=== MyShop ===")
     print(f"=== {title} ===")
     print()
 
